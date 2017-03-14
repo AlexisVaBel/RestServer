@@ -1,4 +1,5 @@
 #include "factory/servfactory.hpp"
+#include <getopt.h>
 
 //Реализовать клиент-серверное приложение с использованием библиотеки Casablanca REST API https://casablanca.codeplex.com/.
 //Сервер получает команды от клиента и выполняет содержимое этих команд. Требования по выполнению задания:
@@ -10,10 +11,67 @@
 //   Результаты выполнения и/или иная отладочная информация выводятся в консоль
 //  (или лог файл, если сервер запущен в режиме демона)
 
+struct globalArgs_t{
+    char *name;
+    char *host;
+    int     port;
+    char *dir;
+    char isProcess;
+} globalArgs;
+
+// n - name
+// h - host
+// p - port
+// d - dir to work
+// t - thread is working as daemon
+static const char *optString="n:h:p:d:t:";
+
+void fillArgs(int opt){
+    switch(opt){
+    case 'n':
+    case 'N':
+        globalArgs.name=optarg;
+    case 'h':
+    case 'H':
+        globalArgs.host=optarg;
+        break;
+    case 'p':
+    case 'P':
+        globalArgs.port=stoi(optarg);
+        break;
+    case 'd':
+    case 'D':
+        globalArgs.dir=optarg;
+        break;
+    case 't':
+    case 'T':
+        globalArgs.isProcess=stoi(optarg);
+        break;
+    }
+}
+
+void initArgs(){
+    globalArgs.name="restserver";
+    globalArgs.host="http://localhost";
+    globalArgs.port=30000;
+    globalArgs.dir="playground";
+    globalArgs.isProcess=0;
+}
 
 int main(int argc,char **argv){
-    auto serv=ServFactory::Instance()->Create("restserver");
-    serv->setAddress("http://localhost",30000);
+    initArgs();
+    int opt=0;
+    do{
+        opt=getopt(argc,argv,optString);
+        fillArgs(opt);
+    }while(opt!=-1);
+    auto serv=ServFactory::Instance()->Create(globalArgs.name);
+    if(serv==nullptr)    return 1;
+    serv->setAddress(globalArgs.host,globalArgs.port);
     serv->work();
+//    auto serv=ServFactory::Instance()->Create("restserver");
+//    if(serv==nullptr)    return 1;
+//    serv->setAddress("http://localhost",30000);
+//    serv->work();
     return 0;
 }
