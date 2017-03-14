@@ -1,0 +1,2 @@
+#!/bin/bash
+curl http://localhost:30000/api/v1.0/$1 --upload-file $1

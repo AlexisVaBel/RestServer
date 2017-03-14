@@ -1,0 +1,2 @@
+#!/bin/bash
+curl -XPOST -H Content-type: application/json -d {"subject":"Good news, everyone!","body":"..."} http://127.0.0.1:30000/api/v1.0
