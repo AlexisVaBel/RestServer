@@ -1,30 +1,29 @@
 #include "crestserver.hpp"
-#include <fstream>
-#include <functional>
-#include <pplx/pplx.h>
 
+#include <string>
+#include <pplx/pplx.h>
 #include <cpprest/streams.h>
 #include <cpprest/filestream.h>
-#include <string>
+#include <boost/filesystem.hpp>
+
 
 
 static HTTPServRegistrator<CRestServer> register_serv("restserver");
 
 using namespace pplx;
 
-namespace RESTSERV{    
+namespace RSTSVR1{
     const string STR_APINAME="api";
-    const string STR_APIVERS="v1.0";
-    const string FILE_DIR="./playground/";
+    const string STR_APIVERS="v1.0";    
 }
 
 
 CRestServer::CRestServer():m_bWork(true){
-    TRACE("restserver created");
+    INFO("restserver created");
 }
 
 CRestServer::~CRestServer(){
-    TRACE("restserver deleted");
+    INFO("restserver deleted");
 }
 
 
@@ -42,35 +41,40 @@ CRestServer::~CRestServer(){
 
 void CRestServer::work(){
     if (this->m_strAddr.compare("")==0){
-        TRACE("no port setted");
+        ERR("WORK: no port setted");
         return;
     };
 
+    if(!isDirExists()){
+        ERR("WORK: no working dir, exit");
+        return;
+    }
+
     string_t str_tAddr=m_strAddr.append(":").append(std::to_string(m_iPort));
     m_listener= http_listener(str_tAddr);
-    m_listener.support(methods::GET,std::bind(&CRestServer::handle_get,this,std::placeholders::_1));
-    m_listener.support(methods::PUT,std::bind(&CRestServer::handle_put,this,std::placeholders::_1));
-    m_listener.support(methods::DEL,std::bind(&CRestServer::handle_delete,this,std::placeholders::_1));
-    m_listener.support(methods::POST,std::bind(&CRestServer::handle_post,this,std::placeholders::_1));
+    m_listener.support(methods::GET,std::bind(&CRestServer::handleGet,this,std::placeholders::_1));
+    m_listener.support(methods::PUT,std::bind(&CRestServer::handlePut,this,std::placeholders::_1));
+    m_listener.support(methods::DEL,std::bind(&CRestServer::handleDelete,this,std::placeholders::_1));
+    m_listener.support(methods::POST,std::bind(&CRestServer::handlePost,this,std::placeholders::_1));
 
-    TRACE("listnening");
+    TRACE("WORK: listnening");
     TRACE(m_strAddr.c_str());
 
     try{
         m_listener.open().wait();
     }catch (const std::system_error& e){
-        TRACE(e.what());
+        ERR((e.what()));
         return;
     }
 
     while(m_bWork){
-
+        usleep(20);
     }
 
     try{
         m_listener.close().wait();
     }catch(std::system_error &err){
-        TRACE(err.what());
+        ERR(err.what());
     }
 }
 
@@ -82,96 +86,106 @@ void CRestServer::stop(){
 //!throws:
 //! 1. undefined hexadecimal value
 //!
-void CRestServer::handle_get(http_request message){
-    TRACE("get handle");
+void CRestServer::handleGet(http_request message){
+    INFO("get handle");
 
     string strName=getNameFromMes(message);
     string strToGet="";
 
     if(strName.empty()){
+        ERR("GET: no filename");
         message.reply(status_codes::BadRequest,U("no filename"));
         return;
     }else{
-        strToGet=RESTSERV::FILE_DIR+strName;
-    }
+        strToGet=m_strDir+"/"+strName;
+    }    
 
-
-    // to stand alone class - file procer or smth else <bel>
-    if (FILE *file = fopen(strToGet.c_str(), "r")) {
-        fclose(file);
-    } else {
+    if(!isFileExists(strToGet.c_str())){
+        ERR("GET: no file exists "+strName);
         message.reply(status_codes::BadRequest,U("no file"));
         return;
     }
-    // to stand alone class - file procer
+
 
     concurrency::streams::file_stream<unsigned char>::open_istream(strToGet).then([=]
         (task<concurrency::streams::basic_istream<unsigned char>>  prevTask){
-        try {
+        try {            
             auto fileStream=prevTask.get(); // got ready file stream
-
             http_response resp;             // prepare response with OK status
             resp.set_body(fileStream);
             resp.set_status_code(status_codes::OK);
-            return message.reply(resp).then([fileStream,message](task<void> prevResp){
-                fileStream.close();
+            return message.reply(resp).then([fileStream,message,strName](task<void> prevResp){
                 try {
+                    fileStream.close();
+                    INFO("GET: "+strName+" file send to client");
                     if(prevResp.is_done())message.reply(status_codes::OK);
-                } catch (...) {
+                } catch (const std::system_error& e) {
+                    ERR("GET: file stream err");
+                    ERR(e.what());
                     message.reply(status_codes::BadRequest);
                 }
             });
 
-        } catch (...) {
+        } catch (const std::system_error& e) {
+            ERR("GET: task err");
+            ERR(e.what());
             return pplx::task_from_result();
         }
     }).wait();
 }
 
-void CRestServer::handle_post(http_request message){
-    TRACE("got post handle");
+void CRestServer::handlePost(http_request message){
+    INFO("got post handle");
+    INFO("shutting down serv");
+    //?using post as delete,
+    //?using post as put method,
+    //?using post as append method
+    //?using post to shutdown server, buhhhahaaha-ha-ha, BIG-bug-BackDoor
+    message.reply(status_codes::OK,U("Post is not used")).then([=](task<void> readyTask){
+        stop();
+    });
 
-    print_Mess(message);    
-    //using post as delete,
-    //using post as put method,
-    //using post as append method
-    //using post to shutdown server, ha-ha-ha - that bug was in our java-plc
-    message.reply(status_codes::OK,U("responded,Post"));
 }
 
-void CRestServer::handle_put(http_request message){
-    TRACE("got put handle");
+void CRestServer::handlePut(http_request message){
+    INFO("got put handle");
 
     string strName=getNameFromMes(message);
-    string strToPut=RESTSERV::FILE_DIR+strName;
+    string strToPut=m_strDir+"/"+strName;
     message.extract_vector().then([=](std::vector<unsigned char> vectCh){
             ofstream outfile(strToPut.data(), ios::out | ios::binary);
             try{
+                INFO("PUT: written file "+strName);
                 outfile.write((const char*)&vectCh[0], vectCh.size());
-                outfile.close();
+                outfile.close();                
                 message.reply(status_codes::OK,U("Written file "+strName));
             }catch(...){
+                ERR("PUT: unable to write file "+strName);
                 message.reply(status_codes::BadRequest,U("unable to write"+strName));
             }
         }).wait();
 }
 
-void CRestServer::handle_delete(http_request message){
-    TRACE("got del handle");    
+void CRestServer::handleDelete(http_request message){
+    INFO("got del handle");
 
     string strToDel="";
     string strName=getNameFromMes(message);
     if(strName.empty()){
+        ERR("DEL: no file name "+strName);
         message.reply(status_codes::BadRequest,U("no filename"));
         return;
     }else{
-        strToDel=RESTSERV::FILE_DIR+strName;
+        strToDel=m_strDir+"/"+strName;
     }
 
     if(remove(strToDel.data())!=0){
+        ERR("DEL: no such file "+strName);
         message.reply(status_codes::BadRequest,U(strName.append(" no such file")));
-    }else
+    }else{
+        INFO("DEL: file "+strName+" deleted");
         message.reply(status_codes::OK,U(strName.append(" deleted")));
+    }
 }
 
 
@@ -181,17 +195,40 @@ string CRestServer::getNameFromMes(http_request message){
     bool okAPI=false;
     bool okVERS=false;
     while(vctPnt!=vct.end()){
-        TRACE(*vctPnt);
         if(okAPI&&okVERS)return (*vctPnt);
-        if((*vctPnt).compare(RESTSERV::STR_APINAME)==0)  okAPI=true;
-        if((*vctPnt).compare(RESTSERV::STR_APIVERS)==0)  okVERS=true;
+        if((*vctPnt).compare(RSTSVR1::STR_APINAME)==0)  okAPI=true;
+        if((*vctPnt).compare(RSTSVR1::STR_APIVERS)==0)  okVERS=true;
         vctPnt++;
     }
     return "";
 }
 
+bool CRestServer::isDirExists(){
+    INFO("checking dir "+m_strDir);
+    boost::filesystem::path dir(m_strDir);
+    if(boost::filesystem::is_directory(m_strDir))return true;
+    INFO("Creating dir "+m_strDir);
+    if(boost::filesystem::create_directory(m_strDir))return true;
+    ERR("Can`t create dir"+m_strDir);
+    return false;
+}
 
-void CRestServer::print_Mess(http_request message){
+bool CRestServer::isFileExists(const char *chName){
+    if(boost::filesystem::exists(chName)){
+       if(boost::filesystem::is_regular_file(chName)) return true;
+    };
+    return false;
+
+//    if (FILE *file = fopen(chName, "r")) {
+//        fclose(file);
+//        return true;
+//    } else {
+//        return false;
+//    }
+}
+
+
+void CRestServer::printMess(http_request message){
     auto vct=uri::split_path(uri::decode(message.absolute_uri().path()));
     auto vctPnt=vct.begin();
     while(vctPnt!=vct.end()){
@@ -201,13 +238,4 @@ void CRestServer::print_Mess(http_request message){
 }
 
 
-
-void CRestServer::handle_error(pplx::task<void> &t){
-    try{
-        t.get();
-    }
-    catch(...){
-
-    }
-}
 

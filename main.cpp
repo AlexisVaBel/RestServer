@@ -1,5 +1,15 @@
 #include "factory/servfactory.hpp"
+
+//
 #include <getopt.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+
+#include <boost/log/core.hpp>
+#include <boost/log/trivial.hpp>
+#include <boost/log/expressions.hpp>
+#include <boost/log/utility/setup/file.hpp>
 
 //Реализовать клиент-серверное приложение с использованием библиотеки Casablanca REST API https://casablanca.codeplex.com/.
 //Сервер получает команды от клиента и выполняет содержимое этих команд. Требования по выполнению задания:
@@ -24,6 +34,9 @@ struct globalArgs_t{
 // p - port
 // d - dir to work
 // t - thread is working as daemon
+
+// usage ./01_restserv -p 3669 -d "hell"
+// means start serv on port 3669, setting working dir to "hell"
 static const char *optString="n:h:p:d:t:";
 
 void fillArgs(int opt){
@@ -58,6 +71,13 @@ void initArgs(){
     globalArgs.isProcess=0;
 }
 
+void setLoggingForDaemon(){
+    boost::log::add_file_log("./resterv.log");
+    boost::log::core::get()->set_filter(
+                boost::log::trivial::severity >=boost::log::trivial::info
+            );
+}
+
 int main(int argc,char **argv){
     initArgs();
     int opt=0;
@@ -66,12 +86,25 @@ int main(int argc,char **argv){
         fillArgs(opt);
     }while(opt!=-1);
     auto serv=ServFactory::Instance()->Create(globalArgs.name);
-    if(serv==nullptr)    return 1;
-    serv->setAddress(globalArgs.host,globalArgs.port);
+    if(serv==nullptr)    return EXIT_FAILURE;
+    serv->setAddress(globalArgs.host,globalArgs.port,globalArgs.dir);
+
+    if(globalArgs.isProcess==1){
+    //process unix like
+        setLoggingForDaemon();
+        pid_t pid,sid;
+        pid=fork();
+        if(pid<0){exit(EXIT_FAILURE);}
+        if(pid>0){exit (EXIT_SUCCESS);}
+
+        umask(0);
+        sid=setsid();
+        if(sid<0) {exit (EXIT_FAILURE);}
+//        close(STDIN_FILENO);
+//        close(STDOUT_FILENO);
+//        close(STDERR_FILENO);
+    };
+
     serv->work();
-//    auto serv=ServFactory::Instance()->Create("restserver");
-//    if(serv==nullptr)    return 1;
-//    serv->setAddress("http://localhost",30000);
-//    serv->work();
-    return 0;
+    return EXIT_SUCCESS;
 }
