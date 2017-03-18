@@ -2,6 +2,7 @@
 # ----------------------------------------------------------------------------
 
 *~
+*build/
 *.pro.user*
 *.autosave
 *.a
@@ -23,7 +24,6 @@ core
 tags
 .DS_Store
 *.debug
-Makefile*
 *.prl
 *.app
 moc_*.cpp
