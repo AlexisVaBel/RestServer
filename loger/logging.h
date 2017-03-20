@@ -11,7 +11,7 @@
 //#define TRACE(msg)            std::cout << msg <<std::endl
 
 
-#define TRACE(msg)            BOOST_LOG_TRIVIAL(trace)<< msg
+#define TRACE(msg)          BOOST_LOG_TRIVIAL(trace)<< msg
 #define INFO(msg)             BOOST_LOG_TRIVIAL(info) << msg
 #define ERR(msg)              BOOST_LOG_TRIVIAL(error)<< msg
 

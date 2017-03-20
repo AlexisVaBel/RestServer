@@ -1,4 +1,4 @@
-#include "factory/servfactory.hpp"
+#include "factory/cservfactory.hpp"
 
 //
 #include <getopt.h>
@@ -21,6 +21,29 @@
 //   Результаты выполнения и/или иная отладочная информация выводятся в консоль
 //  (или лог файл, если сервер запущен в режиме демона)
 
+
+/**
+ * \class main
+ *
+ * \ingroup base project file
+ *
+ *
+ * \brief Starts sever by default or using command line arguments
+ *
+ * \note
+ *
+ * \author A.Beljaev
+ *
+ * \version $Revision: 1.0 $
+ *
+ * \date $Date: 2017/04/18 10:00 $
+ *
+ * Contact: alexisvabel@gmail.com
+ *
+ *
+ */
+
+//// \brief Structure for getopt
 struct globalArgs_t{
     char *name;
     char *host;
@@ -28,17 +51,19 @@ struct globalArgs_t{
     char *dir;
     char isProcess;
 } globalArgs;
-
-// n - name
-// h - host
-// p - port
-// d - dir to work
-// t - thread is working as daemon
-
-// usage ./01_restserv -p 3669 -d "hell"
-// means start serv on port 3669, setting working dir to "hell"
+/// \details
+///  n - name
+///  h - host
+///  p - port
+///  d - dir to work
+///  t - thread is working as daemon
+///  usage ./01_restserv -p 3669 -d "hell" (01_restserv - app name)
+///  means start serv on port 3669,  sett(nd)ing working dir to "hell"
+///
 static const char *optString="n:h:p:d:t:";
 
+
+//// \brief  filing Structure with getopt, than it will be used to start server
 void fillArgs(int opt){
     switch(opt){
     case 'n':
@@ -63,6 +88,7 @@ void fillArgs(int opt){
     }
 }
 
+//// \brief  default Structure with getopt, than it will be used to start server
 void initArgs(){
     globalArgs.name="restserver";
     globalArgs.host="http://localhost";
@@ -71,6 +97,7 @@ void initArgs(){
     globalArgs.isProcess=0;
 }
 
+//// \brief  if app started as daemon, logginh info to file
 void setLoggingForDaemon(){
     boost::log::add_file_log("./resterv.log");
     boost::log::core::get()->set_filter(
@@ -85,12 +112,15 @@ int main(int argc,char **argv){
         opt=getopt(argc,argv,optString);
         fillArgs(opt);
     }while(opt!=-1);
-    auto serv=ServFactory::Instance()->Create(globalArgs.name);
+
+//// \brief creating serv with factory
+    auto serv=CServFactory::Instance()->Create(globalArgs.name);
     if(serv==nullptr)    return EXIT_FAILURE;
     serv->setAddress(globalArgs.host,globalArgs.port,globalArgs.dir);
 
+//// \brief unix way creating daemon
     if(globalArgs.isProcess==1){
-    //process unix like
+
         setLoggingForDaemon();
         pid_t pid,sid;
         pid=fork();
@@ -100,9 +130,9 @@ int main(int argc,char **argv){
         umask(0);
         sid=setsid();
         if(sid<0) {exit (EXIT_FAILURE);}
-//        close(STDIN_FILENO);
-//        close(STDOUT_FILENO);
-//        close(STDERR_FILENO);
+        close(STDIN_FILENO);
+        close(STDOUT_FILENO);
+        close(STDERR_FILENO);
     };
 
     serv->work();

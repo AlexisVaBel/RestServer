@@ -16,14 +16,12 @@ QMAKE_CXXFLAGS += -std=c++11
 
 SOURCES += \
     main.cpp \
-    http_api/http_respond.cpp \
-    factory/servfactory.cpp \
-    http_rest/crestserver.cpp
+    http_rest/crestserver.cpp \
+    factory/cservfactory.cpp
 
 HEADERS += \
-    http_api/http_respond.hpp \
-    http_api/httpserver.hpp \
-    factory/servfactory.hpp \
-    factory/httpservregistrator.hpp \
     loger/logging.h \
-    http_rest/crestserver.hpp
+    http_rest/crestserver.hpp \
+    factory/cservfactory.hpp \
+    http_api/ihttpserver.hpp \
+    factory/chttpservregistrator.hpp

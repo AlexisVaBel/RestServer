@@ -5,13 +5,35 @@
 #include <cpprest/streams.h>
 #include <cpprest/filestream.h>
 #include <boost/filesystem.hpp>
+static CHTTPServRegistrator<CRestServer> register_serv("restserver");
+/**
+ * \class crestserver
+ *
+ * \ingroup http_rest
+ *
+ *
+ * \brief Implements ihttserver interface.
+ * uses tasks and restful sdk aka 'casablanca'
+ *
+ * \note
+ *
+ * \author A.Beljaev
+ *
+ * \version $Revision: 1.0 $
+ *
+ * \date $Date: 2017/04/18 10:00 $
+ *
+ * Contact: alexisvabel@gmail.com
+ *
+ *
+ */
 
 
 
-static HTTPServRegistrator<CRestServer> register_serv("restserver");
 
 using namespace pplx;
 
+/// \brief api version v1.0, client should acces to server using address:port/api/v1.0
 namespace RSTSVR1{
     const string STR_APINAME="api";
     const string STR_APIVERS="v1.0";    
@@ -27,18 +49,10 @@ CRestServer::~CRestServer(){
 }
 
 
-// from article "bringing  restfull service" <bel>
-//!Instead of continuously checking for is_done, it’s better to use the then function.
-//It relies on attaching a handler function to the task.
-//It should be easily identifiable for developers using the PPL tasks used for programming Windows Runtime (WinRT)
-//asynchronous operations.
-//!The handler for the then function is invoked only after the task is completed
-//The handler function passed to the then function should take an argument either of type T or task<T>.
-
-// this matters, i haven`t it <bel>
-//Using the argument of type task<T> bestows an additional benefit:
-//It’s the only way to catch exceptions raised by the task operation itself!
-
+/// \details
+/// in work method, checks if addres setted and directory exists or can be created
+/// creates http_listener and binds with handlers for such http methods as put, get, post, del
+/// tries to open and go in forever loop, while m_bWork is setted to false
 void CRestServer::work(){
     if (this->m_strAddr.compare("")==0){
         ERR("WORK: no port setted");
@@ -83,9 +97,12 @@ void CRestServer::stop(){
 }
 
 
-//!throws:
-//! 1. undefined hexadecimal value
-//!
+/// \brief get handler, returns file if it exists
+/// as file or respond can be large it uses streams
+///
+/// \bug client can send some request wich raise 'undefined hexadecimal value'
+
+
 void CRestServer::handleGet(http_request message){
     INFO("get handle");
 
@@ -134,6 +151,9 @@ void CRestServer::handleGet(http_request message){
     }).wait();
 }
 
+/// \brief post not implemented at all, used for stopping server
+/// \bug bagdoor, needs real info if post is usefull
+
 void CRestServer::handlePost(http_request message){
     INFO("got post handle");
     INFO("shutting down serv");
@@ -146,6 +166,8 @@ void CRestServer::handlePost(http_request message){
     });
 
 }
+
+/// \brief writing file to working directory
 
 void CRestServer::handlePut(http_request message){
     INFO("got put handle");
@@ -166,6 +188,7 @@ void CRestServer::handlePut(http_request message){
         }).wait();
 }
 
+/// \brief trying to delete file
 void CRestServer::handleDelete(http_request message){
     INFO("got del handle");
 
@@ -188,7 +211,7 @@ void CRestServer::handleDelete(http_request message){
     }
 }
 
-
+/// \brief helper function which checks for right api and gets filename of request
 string CRestServer::getNameFromMes(http_request message){
     auto vct=uri::split_path(uri::decode(message.absolute_uri().path()));
     auto vctPnt=vct.begin();
@@ -203,6 +226,7 @@ string CRestServer::getNameFromMes(http_request message){
     return "";
 }
 
+/// \brief helper function which checks if dir exists or can be created
 bool CRestServer::isDirExists(){
     INFO("checking dir "+m_strDir);
     boost::filesystem::path dir(m_strDir);
@@ -213,6 +237,7 @@ bool CRestServer::isDirExists(){
     return false;
 }
 
+/// \brief helper function which checks if file exists or can be created
 bool CRestServer::isFileExists(const char *chName){
     if(boost::filesystem::exists(chName)){
        if(boost::filesystem::is_regular_file(chName)) return true;
@@ -227,7 +252,7 @@ bool CRestServer::isFileExists(const char *chName){
 //    }
 }
 
-
+/// \brief helper function for printing income http message
 void CRestServer::printMess(http_request message){
     auto vct=uri::split_path(uri::decode(message.absolute_uri().path()));
     auto vctPnt=vct.begin();

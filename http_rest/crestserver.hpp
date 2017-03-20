@@ -6,8 +6,8 @@
 #include <cpprest/http_listener.h>
 
 
-#include "../http_api/httpserver.hpp"
-#include "../factory/httpservregistrator.hpp"
+#include "../http_api/ihttpserver.hpp"
+#include "../factory/сhttpservregistrator.hpp"
 
 
 using namespace std;
@@ -15,7 +15,7 @@ using namespace utility;
 using namespace web::http;
 using namespace web::http::experimental::listener;
 
-class CRestServer: public HTTPServer{
+class CRestServer: public IHTTPServer{
 public:
     CRestServer();
     ~CRestServer();
